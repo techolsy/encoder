@@ -8,6 +8,24 @@ let DeleteLarge: boolean = false
 let Notify: boolean = false
 const PositionalArgs: Array<string> = []
 
+let spinnerInterval: number | undefined;
+const frames = ["-", "\\", "|", "/"];
+let frameIndex = 0;
+
+function startSpinner() {
+  spinnerInterval = setInterval(() => {
+    Deno.stdout.writeSync(new TextEncoder().encode(`\r${frames[frameIndex++ % frames.length]}`))
+  }, 100)
+}
+
+function stopSpinner(message: string) {
+  if (spinnerInterval !== undefined) {
+    clearInterval(spinnerInterval)
+    spinnerInterval = undefined
+    console.log(`\r${message}`)
+  }
+}
+
 function msg(message: string) {
   console.log(message)
 }
@@ -139,10 +157,14 @@ function poweroff(time: number) {
   setTimeout(() => poweroff(time), 1000)
 }
 
-function encode(input: string) {
-  const outputDirFile = Deno.lstatSync(`./output/${input}`)
-  if (outputDirFile.isFile) {
-    Deno.removeSync(`./output/${input}`)
+async function encode(input: string) {
+  try {
+    const outputDirFile = Deno.lstatSync(`./output/${input}`)
+    if (outputDirFile.isFile) {
+      Deno.removeSync(`./output/${input}`)
+    }
+  } catch {
+    msg("")
   }
 
   info(`Encoding ${input}`)
@@ -158,10 +180,18 @@ function encode(input: string) {
         "-c:v",
         "hevc_vaapi",
         `output/${input}`
-      ]
+      ],
+      stdout: "piped",
+      stderr: "piped",
     })
-    const status = process.outputSync()
-    if (status.success === false) {
+    
+    startSpinner()
+
+    const { success } = await process.spawn().status
+
+    stopSpinner("Done!")
+
+    if (!success) {
       err(`Failed to encode ${input}`)
     }
   } catch {
@@ -196,7 +226,7 @@ function encode(input: string) {
   }
 }
 
-function main() {
+async function main() {
   const homeDir= Deno.env.get("HOME")
 
   if (PositionalArgs[0] !== "usage" && PositionalArgs[0] !== "run" && PositionalArgs[0] !== "poweroff") {
@@ -236,6 +266,9 @@ function main() {
     }
   }
   const totalVideos: number = videos.length
+  if (totalVideos === 0) {
+    err("Input dir is empty")
+  }
 
   let progress: number = 0
   for (const file of videos) {
@@ -244,7 +277,7 @@ function main() {
     if (DryRun) {
       msg(`dry run ${file}`)
     } else {
-      encode(file)
+      await encode(file)
     }
   }
 

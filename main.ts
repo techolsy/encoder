@@ -120,7 +120,7 @@ function commandExists(command: string): boolean {
 function checkCommands() {
   const commands: Array<string> = ["ffmpeg"]
 
-  if (DryRun) {
+  if (Notify) {
     commands.push("notify-send")
   }
 

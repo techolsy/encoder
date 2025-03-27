@@ -241,7 +241,11 @@ function main() {
   for (const file of videos) {
     progress++
     info(`---------- Progress: ${progress} of ${totalVideos} ----------`)
-    encode(file)
+    if (DryRun) {
+      msg(`dry run ${file}`)
+    } else {
+      encode(file)
+    }
   }
 
   if (Notify) {

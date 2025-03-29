@@ -8,24 +8,6 @@ let DeleteLarge: boolean = false
 let Notify: boolean = false
 const PositionalArgs: Array<string> = []
 
-let spinnerInterval: number | undefined;
-const frames = ["-", "\\", "|", "/"];
-let frameIndex = 0;
-
-function startSpinner() {
-  spinnerInterval = setInterval(() => {
-    Deno.stdout.writeSync(new TextEncoder().encode(`\r${frames[frameIndex++ % frames.length]}`))
-  }, 100)
-}
-
-function stopSpinner(message: string) {
-  if (spinnerInterval !== undefined) {
-    clearInterval(spinnerInterval)
-    spinnerInterval = undefined
-    console.log(`\r${message}`)
-  }
-}
-
 function msg(message: string) {
   console.log(message)
 }
@@ -118,7 +100,7 @@ function commandExists(command: string): boolean {
 }
 
 function checkCommands() {
-  const commands: Array<string> = ["ffmpeg"]
+  const commands: Array<string> = ["ffmpeg", "ffprobe"]
 
   if (Notify) {
     commands.push("notify-send")
@@ -157,17 +139,57 @@ function poweroff(time: number) {
   setTimeout(() => poweroff(time), 1000)
 }
 
+function updateProgress(output: string, totalDuration: number) {
+  const match = output.match(/out_time_ms=(\d+)/)
+  if (match) {
+    const timeMs = parseInt(match[1])
+    const timeSec = Math.floor(timeMs / 1_000_000)
+    const progress = Math.min(timeSec / totalDuration, 1)
+
+    const barLength = 30
+    const filledLength = Math.round(barLength * progress)
+    const bar = "█".repeat(filledLength) + "-".repeat(barLength - filledLength)
+    
+    Deno.stdout.writeSync(new TextEncoder().encode(`\r[${bar}] ${Math.floor(progress * 100)}%`))
+  }
+}
+
+async function getVideoDuration(filePath: string): Promise<number | null> {
+  try {
+    const process = new Deno.Command("ffprobe", {
+      args: [
+        "-v", "error",
+        "-show_entries",
+        "format=duration",
+        "-of", "csv=p=0",
+        filePath
+      ],
+      stdout: "piped",
+      stderr: "piped",
+    })
+
+    const { stdout } = await process.output()
+    const duationStr = new TextDecoder().decode(stdout).trim()
+    return parseFloat(duationStr) || null
+  } catch {
+    return null
+  }
+}
+
 async function encode(input: string) {
+  info(`Encoding ${input}`)
+
+  const totalDuration: number | null = await getVideoDuration(`input/${input}`)
+  if (totalDuration === null) {
+    err("Failed to get video duration")
+  }
   try {
     const outputDirFile = Deno.lstatSync(`./output/${input}`)
     if (outputDirFile.isFile) {
       Deno.removeSync(`./output/${input}`)
     }
-  } catch {
-    msg("")
-  }
+  } catch {}
 
-  info(`Encoding ${input}`)
   try {
     const process = new Deno.Command("ffmpeg", {
       args: [
@@ -179,17 +201,31 @@ async function encode(input: string) {
         "format=nv12,hwupload",
         "-c:v",
         "hevc_vaapi",
-        `output/${input}`
+        `output/${input}`,
+        "-progress", "pipe:1",
+        "-loglevel", "error"
       ],
       stdout: "piped",
       stderr: "piped",
     })
+
+    const child = process.spawn()
+    const reader = child.stdout.getReader()
+    const decoder = new TextDecoder()
     
-    startSpinner()
+    while(true) {
+      const { value, done } = await reader.read()
+      if (done) break
 
-    const { success } = await process.spawn().status
+      const output = decoder.decode(value)
 
-    stopSpinner("Done!")
+      if (typeof totalDuration === "number") {
+        updateProgress(output, totalDuration)
+      }
+    }
+
+    const { success } = await child.status
+    console.log("\nEncoding complete!")
 
     if (!success) {
       err(`Failed to encode ${input}`)

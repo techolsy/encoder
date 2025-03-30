@@ -80,7 +80,7 @@ function printUsage() {
   msg("")
   msg("Flags:")
   msg("  -h|--help: Shows this usage message")
-  msg("  -u|--dry-run: Dru run with no changes")
+  msg("  -u|--dry-run: Dry run with no changes")
   msg("  -n|--notify: Send notification after encoding is complete")
   msg("  -d|--delete-file: Deletes old file after file been encoded")
   msg("  -f|--delete-large: Deletes new file if its larger than the old file")

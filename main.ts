@@ -148,7 +148,7 @@ function updateProgress(output: string, totalDuration: number) {
 
     const barLength = 30
     const filledLength = Math.round(barLength * progress)
-    const bar = "█".repeat(filledLength) + "-".repeat(barLength - filledLength)
+    const bar = "#".repeat(filledLength) + "-".repeat(barLength - filledLength)
     
     Deno.stdout.writeSync(new TextEncoder().encode(`\r[${bar}] ${Math.floor(progress * 100)}%`))
   }

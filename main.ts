@@ -69,14 +69,17 @@ function argParse() {
 
 function printUsage() {
   msg("Usage:")
-  msg("  encoder [--help] [--dry-run] [--notify] [--delete-file] [--delete-large] (run|poweroff)")
+  msg("  encoder [--help] [--dry-run] [--notify] [--delete-file] [--delete-large] (run|poweroff|setup)")
   msg("  encoder run")
   msg("  encoder poweroff")
+  msg("  encoder usage")
+  msg("  encoder setup")
   msg("")
   msg("Commands:")
   msg("  run: Start encoding")
   msg("  poweroff: poweroff system after encoding is complete")
   msg("  usage: Shows this usage message")
+  msg("  setup: exits after all directorys are created")
   msg("")
   msg("Flags:")
   msg("  -h|--help: Shows this usage message")
@@ -265,7 +268,7 @@ async function encode(input: string) {
 async function main() {
   const homeDir= Deno.env.get("HOME")
 
-  if (PositionalArgs[0] !== "usage" && PositionalArgs[0] !== "run" && PositionalArgs[0] !== "poweroff") {
+  if (PositionalArgs[0] !== "usage" && PositionalArgs[0] !== "run" && PositionalArgs[0] !== "poweroff" && PositionalArgs[0] !== "setup") {
     printUsage()
   }
 
@@ -288,6 +291,11 @@ async function main() {
     }
   }
 
+  if (PositionalArgs[0] === "setup") {
+    info("Setup is complete")
+    Deno.exit()
+  }
+
   const videos: Array<string> = []
   for (const file of Deno.readDirSync("./input")) {
     if (file.name.endsWith("mp4") || file.name.endsWith("mkv") || file.name.endsWith("ts")) {
@@ -301,6 +309,7 @@ async function main() {
       }
     }
   }
+
   const totalVideos: number = videos.length
   if (totalVideos === 0) {
     err("Input dir is empty")
